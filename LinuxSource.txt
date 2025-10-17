@@ -1001,6 +1001,7 @@ Height = 395
 Linux.LanguageSection = nil
 Linux.LanguageDropdown = nil
 Linux.LanguageButton = nil
+Linux.SettingsTab = nil
 
 function Linux.SetIgnoreIndexes(names)
 for _, name in ipairs(names) do
@@ -1041,7 +1042,45 @@ Linux.Translations[lang][key] = value
 end
 end
 if Linux.RefreshLanguageSettings then
+task.spawn(function()
+task.wait()
 Linux.RefreshLanguageSettings()
+end)
+end
+end
+
+function Linux.RefreshLanguageSettings()
+if not Linux.SettingsTab then
+return
+end
+local availableLanguages = {}
+for lang, _ in pairs(Linux.Translations) do
+table.insert(availableLanguages, lang)
+end
+if #availableLanguages > 0 then
+if not Linux.LanguageSection then
+Linux.LanguageSection = Linux.SettingsTab.Section({ Name = "Language" })
+Linux.LanguageDropdown = Linux.SettingsTab.Dropdown({
+Name = "Select Language",
+Description = "Select an available language",
+Options = availableLanguages,
+Default = Linux.CurrentLanguage,
+Callback = function(selected)
+Linux.SelectedLanguage = selected
+end
+})
+Linux.LanguageButton = Linux.SettingsTab.Button({
+Name = "Apply Language",
+Description = "Apply the selected Language",
+Callback = function()
+Linux.ApplyLanguage(Linux.SelectedLanguage)
+end
+})
+else
+if Linux.LanguageDropdown and Linux.LanguageDropdown.SetOptions then
+Linux.LanguageDropdown.SetOptions(availableLanguages)
+end
+end
 end
 end
 
@@ -5938,11 +5977,12 @@ end
 return TabElements
 end
 if config.ConfigSave ~= false then
-local SettingsTab = LinuxLib.Tab({
+Linux.SettingsTab = LinuxLib.Tab({
 Name = "UI",
 Icon = SettingsIconEnabled and SettingsIcon or nil,
 Enabled = SettingsIconEnabled
 })
+local SettingsTab = Linux.SettingsTab
 SettingsTab.Section({ Name = "Settings" })
 local configNameInput = SettingsTab.Input({
 Name = "Config Name",
@@ -6127,37 +6167,7 @@ Linux.ApplyAccent(Linux.SelectedAccent)
 Linux.SaveAccentSettings()
 end
 })
-Linux.RefreshLanguageSettings = function()
-local availableLanguages = {}
-for lang, _ in pairs(Linux.Translations) do
-table.insert(availableLanguages, lang)
-end
-if #availableLanguages > 0 then
-if not Linux.LanguageSection then
-Linux.LanguageSection = SettingsTab.Section({ Name = "Language" })
-Linux.LanguageDropdown = SettingsTab.Dropdown({
-Name = "Select Language",
-Description = "Select an available language",
-Options = availableLanguages,
-Default = Linux.CurrentLanguage,
-Callback = function(selected)
-Linux.SelectedLanguage = selected
-end
-})
-Linux.LanguageButton = SettingsTab.Button({
-Name = "Apply Language",
-Description = "Apply the selected Language",
-Callback = function()
-Linux.ApplyLanguage(Linux.SelectedLanguage)
-end
-})
-else
-if Linux.LanguageDropdown and Linux.LanguageDropdown.SetOptions then
-Linux.LanguageDropdown.SetOptions(availableLanguages)
-end
-end
-end
-end
+Linux.RefreshLanguageSettings()
 Linux.SetIgnoreIndexes({
 "Config Name",
 "Config List",
