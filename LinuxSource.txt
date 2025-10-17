@@ -2521,12 +2521,13 @@ if input.KeyCode == Enum.KeyCode.LeftAlt then
 LinuxUI.Enabled = not LinuxUI.Enabled
 end
 end))
-local LinuxLib = {}
-local Tabs = {}
-local AllElements = {}
-local CurrentTab = nil
-local tabOrder = 0
-local DefaultTab = nil
+	local LinuxLib = {}
+	local Tabs = {}
+	local AllElements = {}
+	local CurrentTab = nil
+	local tabOrder = 0
+	local DefaultTab = nil
+	local TabScrollPositions = {}
 local function AnimateTabSliders(tabIndex)
 spawn(function()
 if Tabs[tabIndex] and Tabs[tabIndex].Elements then
@@ -2796,88 +2797,112 @@ Image = "rbxassetid://10723394681",
 ImageColor3 = Color3.fromRGB(120, 120, 130),
 ZIndex = 5
 })
-local EmptyText = Linux.Instance("TextLabel", {
-Parent = EmptyStateFrame,
-BackgroundTransparency = 1,
-Size = UDim2.new(1, -40, 0, 30),
-Position = UDim2.new(0, 20, 0.5, 30),
-Font = Enum.Font.GothamSemibold,
-Text = "Looks like there's nothing here",
-TextColor3 = Color3.fromRGB(120, 120, 130),
-TextSize = 16,
-TextXAlignment = Enum.TextXAlignment.Center,
-ZIndex = 5
-})
-EmptyText.Text = "Looks like there's nothing here"
-local function SelectTab()
-if CurrentTab == tabIndex then
-return
-end
-local tweenInfoShrink = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-local tweenInfoExpand = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-if CurrentTab and Tabs[CurrentTab] then
-local oldTab = Tabs[CurrentTab]
-oldTab.Content.Visible = false
-oldTab.TitleFrame.Visible = false
-oldTab.ContainerWrapper.Visible = false
-oldTab.Text.TextColor3 = Color3.fromRGB(210, 210, 210)
-oldTab.Button.BackgroundColor3 = Linux.FrameColor
-oldTab.Button.BackgroundTransparency = 1
-oldTab.Button.BorderSizePixel = 0
-local oldStroke = oldTab.Button:FindFirstChild("UIStroke")
-if oldStroke then
-local tween = TweenService:Create(oldStroke, tweenInfoShrink, { Thickness = 0 })
-globalConnectionManager:addTween(tween)
-tween:Play()
-end
-if oldTab.Icon and not Linux.TabIconAccentColorEnabled then
-local tween = TweenService:Create(oldTab.Icon, tweenInfoShrink, { ImageColor3 = Color3.fromRGB(210, 210, 210) })
-globalConnectionManager:addTween(tween)
-tween:Play()
-end
-if Linux.TabHighlight and oldTab.TabAccentBar then
-local tween = TweenService:Create(oldTab.TabAccentBar, tweenInfoShrink, { Size = UDim2.new(0, 0, 0, 24) })
-globalConnectionManager:addTween(tween)
-tween:Play()
-end
-end
-TabContent.Visible = true
-TitleFrame.Visible = true
-ContainerWrapper.Position = UDim2.new(0, 12, 0, 25)
-ContainerWrapper.Visible = true
-local slideDownTween = TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-local tween = TweenService:Create(ContainerWrapper, slideDownTween, {
-Position = UDim2.new(0, 12, 0, 55)
-})
-globalConnectionManager:addTween(tween)
-tween:Play()
-TabText.TextColor3 = Color3.fromRGB(210, 210, 210)
-TabBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-TabBtn.BackgroundTransparency = 0.78
-TabBtn.BorderSizePixel = 1
-TabBtn.BorderColor3 = Color3.fromRGB(39, 39, 42)
-local tabStroke = TabBtn:FindFirstChild("UIStroke")
-if tabStroke then
-local tween = TweenService:Create(tabStroke, tweenInfoExpand, { Thickness = 1 })
-globalConnectionManager:addTween(tween)
-tween:Play()
-end
-if TabIcon and not Linux.TabIconAccentColorEnabled then
-local tween = TweenService:Create(TabIcon, tweenInfoExpand, { ImageColor3 = Color3.fromRGB(210, 210, 210) })
-globalConnectionManager:addTween(tween)
-tween:Play()
-end
-if Linux.TabHighlight then
-local tween2 = TweenService:Create(TabAccentBar, tweenInfoExpand, { Size = UDim2.new(0, 4, 0, 24) })
-globalConnectionManager:addTween(tween2)
-tween2:Play()
-end
-CurrentTab = tabIndex
-Linux.CurrentTab = tabIndex
-Container.CanvasPosition = Vector2.new(0, 0)
-AnimateTabSliders(tabIndex)
-CheckEmptyState()
-end
+	local EmptyText = Linux.Instance("TextLabel", {
+		Parent = EmptyStateFrame,
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, -40, 0, 30),
+		Position = UDim2.new(0, 20, 0.5, 30),
+		Font = Enum.Font.GothamSemibold,
+		Text = "Looks like there's nothing here",
+		TextColor3 = Color3.fromRGB(120, 120, 130),
+		TextSize = 16,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		ZIndex = 5
+	})
+	EmptyText.Text = "Looks like there's nothing here"
+	
+	local scrollConnection = nil
+	local function SaveScrollPosition(tabIdx, container)
+		if tabIdx and container then
+			TabScrollPositions[tabIdx] = container.CanvasPosition
+		end
+	end
+	
+	local function SelectTab()
+		if CurrentTab == tabIndex then
+			return
+		end
+		local tweenInfoShrink = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		local tweenInfoExpand = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		if CurrentTab and Tabs[CurrentTab] then
+			local oldTab = Tabs[CurrentTab]
+			SaveScrollPosition(CurrentTab, oldTab.Container)
+			if scrollConnection then
+				scrollConnection:Disconnect()
+				scrollConnection = nil
+			end
+			oldTab.Content.Visible = false
+			oldTab.TitleFrame.Visible = false
+			oldTab.ContainerWrapper.Visible = false
+			oldTab.Text.TextColor3 = Color3.fromRGB(210, 210, 210)
+			oldTab.Button.BackgroundColor3 = Linux.FrameColor
+			oldTab.Button.BackgroundTransparency = 1
+			oldTab.Button.BorderSizePixel = 0
+			local oldStroke = oldTab.Button:FindFirstChild("UIStroke")
+			if oldStroke then
+				local tween = TweenService:Create(oldStroke, tweenInfoShrink, { Thickness = 0 })
+				globalConnectionManager:addTween(tween)
+				tween:Play()
+			end
+			if oldTab.Icon and not Linux.TabIconAccentColorEnabled then
+				local tween = TweenService:Create(oldTab.Icon, tweenInfoShrink, { ImageColor3 = Color3.fromRGB(210, 210, 210) })
+				globalConnectionManager:addTween(tween)
+				tween:Play()
+			end
+			if Linux.TabHighlight and oldTab.TabAccentBar then
+				local tween = TweenService:Create(oldTab.TabAccentBar, tweenInfoShrink, { Size = UDim2.new(0, 0, 0, 24) })
+				globalConnectionManager:addTween(tween)
+				tween:Play()
+			end
+		end
+		TabContent.Visible = true
+		TitleFrame.Visible = true
+		ContainerWrapper.Position = UDim2.new(0, 12, 0, 25)
+		ContainerWrapper.Visible = true
+		local slideDownTween = TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		local tween = TweenService:Create(ContainerWrapper, slideDownTween, {
+			Position = UDim2.new(0, 12, 0, 55)
+		})
+		globalConnectionManager:addTween(tween)
+		tween:Play()
+		TabText.TextColor3 = Color3.fromRGB(210, 210, 210)
+		TabBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+		TabBtn.BackgroundTransparency = 0.78
+		TabBtn.BorderSizePixel = 1
+		TabBtn.BorderColor3 = Color3.fromRGB(39, 39, 42)
+		local tabStroke = TabBtn:FindFirstChild("UIStroke")
+		if tabStroke then
+			local tween = TweenService:Create(tabStroke, tweenInfoExpand, { Thickness = 1 })
+			globalConnectionManager:addTween(tween)
+			tween:Play()
+		end
+		if TabIcon and not Linux.TabIconAccentColorEnabled then
+			local tween = TweenService:Create(TabIcon, tweenInfoExpand, { ImageColor3 = Color3.fromRGB(210, 210, 210) })
+			globalConnectionManager:addTween(tween)
+			tween:Play()
+		end
+		if Linux.TabHighlight then
+			local tween2 = TweenService:Create(TabAccentBar, tweenInfoExpand, { Size = UDim2.new(0, 4, 0, 24) })
+			globalConnectionManager:addTween(tween2)
+			tween2:Play()
+		end
+		CurrentTab = tabIndex
+		Linux.CurrentTab = tabIndex
+		
+		if TabScrollPositions[tabIndex] then
+			Container.CanvasPosition = TabScrollPositions[tabIndex]
+		else
+			Container.CanvasPosition = Vector2.new(0, 0)
+			TabScrollPositions[tabIndex] = Vector2.new(0, 0)
+		end
+		
+		scrollConnection = globalConnectionManager:addConnection(Container:GetPropertyChangedSignal("CanvasPosition"):Connect(function()
+			SaveScrollPosition(tabIndex, Container)
+		end))
+		
+		AnimateTabSliders(tabIndex)
+		CheckEmptyState()
+	end
 globalConnectionManager:addConnection(TabBtn.MouseButton1Click:Connect(SelectTab))
 Tabs[tabIndex] = {
 Name = config.Name,
